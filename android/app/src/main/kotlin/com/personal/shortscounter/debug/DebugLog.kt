@@ -46,7 +46,7 @@ object DebugLog {
             entries.addLast(entry)
             entry
         }
-        EventHub.emitDebug(entry)
+        EventHub.debug.emit(entry)
     }
 
     fun snapshot(): List<DebugEntry> = synchronized(this) { entries.toList() }

@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 
+import '../models/day_count.dart';
 import '../models/debug_entry.dart';
 import '../models/service_status.dart';
 
@@ -8,7 +9,26 @@ class NativeBridge {
   NativeBridge._();
 
   static const _methods = MethodChannel('shorts_counter/methods');
+  static const _countEvents = EventChannel('shorts_counter/count');
   static const _debugEvents = EventChannel('shorts_counter/debug');
+
+  static Future<DayCount> getToday() async {
+    final map = await _methods.invokeMapMethod<String, dynamic>('getToday');
+    return DayCount.fromMap(map!);
+  }
+
+  static Future<DayCount> resetToday() async {
+    final map = await _methods.invokeMapMethod<String, dynamic>('resetToday');
+    return DayCount.fromMap(map!);
+  }
+
+  /// Today's count, pushed each time a Short is counted or the count is reset.
+  static Stream<DayCount> countUpdates() => _countEvents
+      .receiveBroadcastStream()
+      .map((event) => DayCount.fromMap(event as Map<dynamic, dynamic>));
+
+  static Future<int> getDailyLimit() async =>
+      await _methods.invokeMethod<int>('getDailyLimit') ?? 30;
 
   static Future<ServiceStatus> getServiceStatus() async {
     final map = await _methods.invokeMapMethod<String, dynamic>('getServiceStatus');

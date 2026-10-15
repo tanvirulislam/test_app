@@ -6,17 +6,17 @@ import android.net.Uri
 import android.provider.Settings
 import com.personal.shortscounter.bridge.EventHub
 import com.personal.shortscounter.data.CounterStore
-import com.personal.shortscounter.debug.DebugEntry
 import com.personal.shortscounter.debug.DebugLog
 import com.personal.shortscounter.service.ShortsAccessibilityService
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val store by lazy { CounterStore(this) }
-    private var debugListener: ((DebugEntry) -> Unit)? = null
+    private val unsubscribers = mutableListOf<() -> Unit>()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -44,6 +44,13 @@ class MainActivity : FlutterActivity() {
                     )
                     result.success(null)
                 }
+                "getToday" -> result.success(store.today().toMap())
+                "resetToday" -> {
+                    val today = store.resetToday()
+                    EventHub.count.emit(today)
+                    result.success(today.toMap())
+                }
+                "getDailyLimit" -> result.success(store.dailyLimit)
                 "getDebugMode" -> result.success(store.debugMode)
                 "setDebugMode" -> {
                     val enabled = call.argument<Boolean>("enabled") == true
@@ -60,24 +67,38 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        EventChannel(messenger, DEBUG_EVENTS_CHANNEL).setStreamHandler(object : EventChannel.StreamHandler {
+        bindTopic(messenger, COUNT_EVENTS_CHANNEL, EventHub.count) { it.toMap() }
+        bindTopic(messenger, DEBUG_EVENTS_CHANNEL, EventHub.debug) { it.toMap() }
+    }
+
+    /** Forwards an [EventHub] topic to an EventChannel while Flutter listens. */
+    private fun <T> bindTopic(
+        messenger: BinaryMessenger,
+        channel: String,
+        topic: EventHub.Topic<T>,
+        encode: (T) -> Any,
+    ) {
+        var listener: ((T) -> Unit)? = null
+        val unsubscribe = {
+            listener?.let(topic::remove)
+            listener = null
+        }
+        unsubscribers += unsubscribe
+        EventChannel(messenger, channel).setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
-                debugListener?.let(EventHub::removeDebugListener)
-                val listener: (DebugEntry) -> Unit = { events.success(it.toMap()) }
-                debugListener = listener
-                EventHub.addDebugListener(listener)
+                unsubscribe()
+                val newListener: (T) -> Unit = { events.success(encode(it)) }
+                listener = newListener
+                topic.add(newListener)
             }
 
-            override fun onCancel(arguments: Any?) {
-                debugListener?.let(EventHub::removeDebugListener)
-                debugListener = null
-            }
+            override fun onCancel(arguments: Any?) = unsubscribe()
         })
     }
 
     override fun onDestroy() {
-        debugListener?.let(EventHub::removeDebugListener)
-        debugListener = null
+        unsubscribers.forEach { it() }
+        unsubscribers.clear()
         super.onDestroy()
     }
 
@@ -92,6 +113,7 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val METHODS_CHANNEL = "shorts_counter/methods"
+        const val COUNT_EVENTS_CHANNEL = "shorts_counter/count"
         const val DEBUG_EVENTS_CHANNEL = "shorts_counter/debug"
     }
 }

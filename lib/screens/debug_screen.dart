@@ -71,6 +71,26 @@ class _DebugScreenState extends State<DebugScreen> {
     if (mounted) setState(_entries.clear);
   }
 
+  Future<void> _resetToday() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Reset today's count?"),
+        content: const Text("Sets today's Shorts count back to 0. History for other days is kept."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reset')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await NativeBridge.resetToday();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Today's count reset to 0")),
+    );
+  }
+
   Future<void> _copyAll() async {
     // Newest entries first until the cap, then put back in time order.
     final picked = <String>[];
@@ -104,9 +124,14 @@ class _DebugScreenState extends State<DebugScreen> {
             onPressed: _entries.isEmpty ? null : _copyAll,
           ),
           IconButton(
-            tooltip: 'Clear',
+            tooltip: 'Clear log',
             icon: const Icon(Icons.delete_outline),
             onPressed: _entries.isEmpty ? null : _clear,
+          ),
+          IconButton(
+            tooltip: "Reset today's count",
+            icon: const Icon(Icons.restart_alt),
+            onPressed: _resetToday,
           ),
         ],
       ),

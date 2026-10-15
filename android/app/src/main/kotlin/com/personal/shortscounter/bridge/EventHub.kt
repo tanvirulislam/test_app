@@ -2,6 +2,7 @@ package com.personal.shortscounter.bridge
 
 import android.os.Handler
 import android.os.Looper
+import com.personal.shortscounter.data.DayCount
 import com.personal.shortscounter.debug.DebugEntry
 import java.util.concurrent.CopyOnWriteArraySet
 
@@ -11,15 +12,20 @@ import java.util.concurrent.CopyOnWriteArraySet
  * on the main thread.
  */
 object EventHub {
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private val debugListeners = CopyOnWriteArraySet<(DebugEntry) -> Unit>()
+    val debug = Topic<DebugEntry>()
+    val count = Topic<DayCount>()
 
-    fun addDebugListener(listener: (DebugEntry) -> Unit) = debugListeners.add(listener)
+    class Topic<T> {
+        private val mainHandler = Handler(Looper.getMainLooper())
+        private val listeners = CopyOnWriteArraySet<(T) -> Unit>()
 
-    fun removeDebugListener(listener: (DebugEntry) -> Unit) = debugListeners.remove(listener)
+        fun add(listener: (T) -> Unit) = listeners.add(listener)
 
-    fun emitDebug(entry: DebugEntry) {
-        if (debugListeners.isEmpty()) return
-        mainHandler.post { debugListeners.forEach { it(entry) } }
+        fun remove(listener: (T) -> Unit) = listeners.remove(listener)
+
+        fun emit(value: T) {
+            if (listeners.isEmpty()) return
+            mainHandler.post { listeners.forEach { it(value) } }
+        }
     }
 }

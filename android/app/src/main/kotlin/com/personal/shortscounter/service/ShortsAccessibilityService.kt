@@ -5,44 +5,74 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
+import com.personal.shortscounter.bridge.EventHub
 import com.personal.shortscounter.data.CounterStore
 import com.personal.shortscounter.debug.DebugLog
 import com.personal.shortscounter.debug.NodeDump
 import com.personal.shortscounter.debug.oneLine
 import com.personal.shortscounter.detection.DetectionConfig
+import com.personal.shortscounter.detection.Fingerprint
+import com.personal.shortscounter.detection.ShortsDetector
+import com.personal.shortscounter.detection.ShortsDetector.Decision
 
 class ShortsAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private val evaluateRunnable = Runnable { evaluate() }
+    private val detector = ShortsDetector(DetectionConfig.RECENT_SHORTS_MEMORY)
+    private lateinit var store: CounterStore
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         // DetectionConfig is the source of truth for the package filter.
         serviceInfo = serviceInfo.apply { packageNames = arrayOf(DetectionConfig.YOUTUBE_PACKAGE) }
-        DebugLog.enabled = CounterStore(this).debugMode
+        store = CounterStore(this)
+        DebugLog.enabled = store.debugMode
         isRunning = true
         DebugLog.log("service", "Connected, listening to ${DetectionConfig.YOUTUBE_PACKAGE}")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || event.packageName?.toString() != DetectionConfig.YOUTUBE_PACKAGE) return
-        // Only logging so far, so there is nothing to do while Debug mode is off.
-        if (!DebugLog.enabled) return
-        DebugLog.log("event", describe(event))
+        if (DebugLog.enabled) DebugLog.log("event", describe(event))
+        if (event.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED && isSwipe(event)) {
+            detector.onSwipe()
+        }
         // Trailing debounce: inspect the screen once, after the UI settles.
         handler.removeCallbacks(evaluateRunnable)
         handler.postDelayed(evaluateRunnable, DetectionConfig.SETTLE_DELAY_MS)
     }
 
+    private fun isSwipe(event: AccessibilityEvent): Boolean {
+        val id = event.source?.viewIdResourceName?.substringAfter(":id/") ?: return false
+        return id in DetectionConfig.SWIPE_SOURCE_IDS
+    }
+
     private fun evaluate() {
         val root = rootInActiveWindow ?: return
         if (root.packageName?.toString() != DetectionConfig.YOUTUBE_PACKAGE) return
-        val matchedId = DetectionConfig.SHORTS_CONTAINER_IDS.firstOrNull { id ->
-            root.findAccessibilityNodeInfosByViewId(DetectionConfig.fullId(id)).any { it.isVisibleToUser }
+
+        val container = findShortsContainer(root)
+        val fingerprint = container?.let { Fingerprint.from(Fingerprint.collectLabels(it)) }
+        val decision = if (container == null) detector.onLeftShorts() else detector.onShortVisible(fingerprint)
+
+        if (decision == Decision.COUNTED) {
+            EventHub.count.emit(store.increment())
         }
-        val header = if (matchedId != null) "inShorts=true (via $matchedId)" else "inShorts=false"
-        DebugLog.log("screen", header + "\n" + NodeDump.dump(root))
+        if (DebugLog.enabled) {
+            val detail = if (container == null) {
+                NodeDump.dump(root)
+            } else {
+                "fingerprint: ${fingerprint?.oneLine(300) ?: "-"}\n" + NodeDump.dump(container)
+            }
+            DebugLog.log("screen", "$decision\n$detail")
+        }
     }
+
+    private fun findShortsContainer(root: AccessibilityNodeInfo): AccessibilityNodeInfo? =
+        DetectionConfig.SHORTS_CONTAINER_IDS.firstNotNullOfOrNull { id ->
+            root.findAccessibilityNodeInfosByViewId(DetectionConfig.fullId(id)).firstOrNull { it.isVisibleToUser }
+        }
 
     private fun describe(event: AccessibilityEvent): String = buildString {
         append(AccessibilityEvent.eventTypeToString(event.eventType).removePrefix("TYPE_"))
