@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/day_count.dart';
 import '../models/service_status.dart';
 import '../services/native_bridge.dart';
+import '../widgets/error_card.dart';
 import 'debug_screen.dart';
 import 'onboarding_screen.dart';
 
@@ -21,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ServiceStatus? _status;
   DayCount? _today;
   int _limit = 30;
+  Object? _error;
 
   @override
   void initState() {
@@ -40,17 +42,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refresh() async {
-    final results = await Future.wait([
-      NativeBridge.getServiceStatus(),
-      NativeBridge.getToday(),
-      NativeBridge.getDailyLimit(),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _status = results[0] as ServiceStatus;
-      _today = results[1] as DayCount;
-      _limit = results[2] as int;
-    });
+    try {
+      final results = await Future.wait([
+        NativeBridge.getServiceStatus(),
+        NativeBridge.getToday(),
+        NativeBridge.getDailyLimit(),
+      ]).timeout(NativeBridge.callTimeout);
+      if (!mounted) return;
+      setState(() {
+        _status = results[0] as ServiceStatus;
+        _today = results[1] as DayCount;
+        _limit = results[2] as int;
+        _error = null;
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
+    }
   }
 
   void _open(Widget screen) {
@@ -89,12 +96,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   onTap: () => _open(const OnboardingScreen()),
                 ),
               ),
-            if (today == null)
+            if (_error != null) ErrorCard(error: _error!, onRetry: _refresh),
+            if (today == null && _error == null)
               const Padding(
                 padding: EdgeInsets.all(48),
                 child: Center(child: CircularProgressIndicator()),
               )
-            else
+            else if (today != null)
               _TodayCard(count: today.count, limit: _limit),
           ],
         ),

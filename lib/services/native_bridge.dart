@@ -12,6 +12,9 @@ class NativeBridge {
   static const _countEvents = EventChannel('shorts_counter/count');
   static const _debugEvents = EventChannel('shorts_counter/debug');
 
+  /// Native calls answer in milliseconds; anything slower means something is stuck.
+  static const callTimeout = Duration(seconds: 5);
+
   static Future<DayCount> getToday() async {
     final map = await _methods.invokeMapMethod<String, dynamic>('getToday');
     return DayCount.fromMap(map!);
