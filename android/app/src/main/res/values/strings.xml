@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_label">Shorts Counter</string>
+    <string name="accessibility_service_description">Counts the YouTube Shorts you watch. It only reads the YouTube app\'s screen layout to notice when you swipe to a new Short. Nothing leaves your phone.</string>
+</resources>
