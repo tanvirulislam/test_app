@@ -72,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final today = _today;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Shorts Counter'),
+        title: const Text('ShortsCounter'),
         actions: [
           IconButton(
             tooltip: 'Debug log',

@@ -1,4 +1,4 @@
-# test_app
+# ShortsCounter
 
 A new Flutter project.
 

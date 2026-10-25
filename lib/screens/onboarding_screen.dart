@@ -51,12 +51,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final enabled = _status?.enabled ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Set up Shorts Counter')),
+      appBar: AppBar(title: const Text('Set up ShortsCounter')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            'Shorts Counter uses an Accessibility service to notice when you swipe '
+            'ShortsCounter uses an Accessibility service to notice when you swipe '
             'to a new Short in the YouTube app. It only listens to YouTube, and '
             'nothing leaves your phone.',
             style: theme.textTheme.bodyLarge,
@@ -78,7 +78,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Open Accessibility settings, find "Shorts Counter" (often under '
+                    'Open Accessibility settings, find "ShortsCounter" (often under '
                     '"Downloaded apps" or "Installed apps"), and turn it on.',
                   ),
                   const SizedBox(height: 12),

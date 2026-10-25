@@ -12,7 +12,7 @@ class ShortsCounterApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Shorts Counter',
+      title: 'ShortsCounter',
       theme: _theme(Brightness.light),
       darkTheme: _theme(Brightness.dark),
       home: const _StartGate(),
@@ -46,7 +46,7 @@ class _StartGateState extends State<_StartGate> {
         final status = snapshot.data;
         if (snapshot.hasError) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Shorts Counter')),
+            appBar: AppBar(title: const Text('ShortsCounter')),
             body: ListView(
               padding: const EdgeInsets.all(16),
               children: [
